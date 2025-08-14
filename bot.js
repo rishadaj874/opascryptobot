@@ -1,66 +1,78 @@
-const { Telegraf } = require('telegraf');
+require('dotenv').config();
+const TelegramBot = require('node-telegram-bot-api');
 
-// Load bot token from environment variable
-const BOT_TOKEN = process.env.BOT_TOKEN;
-if (!BOT_TOKEN) {
-    console.error("❌ BOT_TOKEN is missing. Set it in your environment variables.");
+const token = process.env.BOT_TOKEN;
+
+if (!token) {
+    console.error('❌ BOT_TOKEN not found in .env file');
     process.exit(1);
 }
 
-const bot = new Telegraf(BOT_TOKEN);
+// List of bad words (lowercase)
+const badWords = ['badword1', 'badword2', 'badword3'];
 
-// ✅ Bad words list (You can add more later)
-const badWords = ['badword', 'stupid', 'idiot'];
+// Create bot with polling
+const bot = new TelegramBot(token, { polling: true });
 
-// ✅ Welcome message
-bot.on('new_chat_members', (ctx) => {
-    ctx.message.new_chat_members.forEach((member) => {
-        ctx.reply(`👋 Welcome, ${member.first_name}!`);
+// Welcome message
+bot.on('new_chat_members', (msg) => {
+    msg.new_chat_members.forEach(member => {
+        bot.sendMessage(
+            msg.chat.id,
+            `👋 Welcome, ${member.first_name}!`
+        );
     });
 });
 
-// ✅ Goodbye message
-bot.on('left_chat_member', (ctx) => {
-    const member = ctx.message.left_chat_member;
-    ctx.reply(`👋 Goodbye, ${member.first_name}.`);
+// Goodbye message
+bot.on('left_chat_member', (msg) => {
+    bot.sendMessage(
+        msg.chat.id,
+        `👋 Goodbye, ${msg.left_chat_member.first_name}!`
+    );
 });
 
-// ✅ Auto-delete bad words
-bot.on('text', async (ctx) => {
-    const text = ctx.message.text.toLowerCase();
+// Message handling
+bot.on('message', async (msg) => {
+    if (!msg.text) return;
+
+    const text = msg.text.toLowerCase();
+
+    // Auto-delete bad words
     if (badWords.some(word => text.includes(word))) {
+        await bot.deleteMessage(msg.chat.id, msg.message_id).catch(() => {});
+        return;
+    }
+
+    // Kick command — must reply & from admin
+    if (msg.text.startsWith('/kick') && msg.reply_to_message) {
         try {
-            await ctx.deleteMessage();
-            console.log(`🗑 Deleted a message with bad words: ${ctx.message.text}`);
+            const chatMember = await bot.getChatMember(msg.chat.id, msg.from.id);
+
+            if (['administrator', 'creator'].includes(chatMember.status)) {
+                const userId = msg.reply_to_message.from.id;
+                await bot.kickChatMember(msg.chat.id, userId);
+                bot.sendMessage(msg.chat.id, `🚫 User ${msg.reply_to_message.from.first_name} was kicked.`);
+            } else {
+                bot.sendMessage(msg.chat.id, '❌ You are not an admin!');
+            }
         } catch (err) {
-            console.error('Failed to delete message:', err.message);
+            console.error(err);
         }
+    }
+
+    // Wanted command — DM sender
+    if (msg.text.startsWith('/wanted')) {
+        const args = msg.text.split(' ').slice(1).join(' ');
+        if (!args) {
+            bot.sendMessage(msg.chat.id, 'Usage: /wanted <username or message>');
+            return;
+        }
+
+        bot.sendMessage(msg.from.id, `📢 Wanted notice: ${args}`).catch(() => {
+            bot.sendMessage(msg.chat.id, '⚠️ Cannot DM you. Please start the bot in private first.');
+        });
     }
 });
 
-// ✅ Kick user if admin replies with /kick
-bot.command('kick', async (ctx) => {
-    if (!ctx.message.reply_to_message) {
-        return ctx.reply('❗ Reply to the user’s message you want to kick.');
-    }
-
-    const userIdToKick = ctx.message.reply_to_message.from.id;
-
-    try {
-        const member = await ctx.getChatMember(ctx.from.id);
-        if (member.status === 'administrator' || member.status === 'creator') {
-            await ctx.kickChatMember(userIdToKick);
-            await ctx.reply(`✅ User has been kicked.`);
-        } else {
-            ctx.reply('❌ Only admins can use this command.');
-        }
-    } catch (err) {
-        console.error('Kick error:', err.message);
-        ctx.reply('⚠️ Failed to kick the user.');
-    }
-});
-
-// ✅ Start bot
-bot.launch()
-    .then(() => console.log('🤖 Bot is running...'))
-    .catch(err => console.error('Failed to start bot:', err.message));
+console.log('🤖 Bot is running...');
