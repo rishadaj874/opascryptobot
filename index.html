@@ -77,11 +77,13 @@
   <script>
     async function shortenLink(longUrl) {
       try {
-        const res = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(longUrl)}`);
+        const res = await fetch(`https://spoo.me/?url=${encodeURIComponent(longUrl)}&json=true`);
         if (!res.ok) throw new Error('Shortening failed');
-        return await res.text();
+        const data = await res.json();
+        if (data.short_url) return data.short_url;
+        throw new Error('Invalid response');
       } catch (err) {
-        console.warn('TinyURL failed, returning original link:', err);
+        console.warn('Spoo.me failed, returning original link:', err);
         return longUrl;
       }
     }
@@ -104,7 +106,7 @@
       document.getElementById("result").innerHTML = `
         <p><strong>Full Link:</strong></p>
         <a href="${analyserLink}" target="_blank">${analyserLink}</a>
-        <p><strong>Short Link:</strong></p>
+        <p><strong>Short Link (spoo.me):</strong></p>
         <a href="${shortLink}" target="_blank">${shortLink}</a>
       `;
     }
