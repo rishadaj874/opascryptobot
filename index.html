@@ -60,6 +60,26 @@
     a:hover {
       text-decoration: underline;
     }
+    #copyBtn {
+      margin-top: 10px;
+      padding: 6px 12px;
+      font-size: 14px;
+      border: none;
+      background-color: #28a745;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+      display: none;
+    }
+    #copyBtn:hover {
+      background-color: #218838;
+    }
+    #copiedMsg {
+      font-size: 14px;
+      color: #28a745;
+      margin-top: 8px;
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -74,6 +94,8 @@
   <button onclick="generateLink()">Generate Link</button>
 
   <div id="result"></div>
+  <button id="copyBtn" onclick="copyLink()">Copy Link</button>
+  <div id="copiedMsg">Copied!</div>
 
   <script>
     async function shortenWithSpoo(longUrl) {
@@ -114,13 +136,26 @@
 
       const analyserLink = `${location.origin}/analyser.html?chat=${encodeURIComponent(chatId)}&redirect=${encodeURIComponent(redirectUrl)}`;
 
-      document.getElementById("result").innerHTML = `<p>Generating short link...</p>`;
+      document.getElementById("result").innerHTML = `<p>Generating link...</p>`;
+      document.getElementById("copyBtn").style.display = "none";
+      document.getElementById("copiedMsg").style.display = "none";
 
       const shortLink = await shortenWithSpoo(analyserLink);
 
       document.getElementById("result").innerHTML = `
-        <a href="${shortLink}" target="_blank">${shortLink}</a>
+        <a href="${shortLink}" target="_blank" id="shortLink">${shortLink}</a>
       `;
+      document.getElementById("copyBtn").style.display = "inline-block";
+    }
+
+    function copyLink() {
+      const linkEl = document.getElementById("shortLink");
+      if (linkEl) {
+        navigator.clipboard.writeText(linkEl.href);
+        const msg = document.getElementById("copiedMsg");
+        msg.style.display = "block";
+        setTimeout(() => (msg.style.display = "none"), 2000);
+      }
     }
   </script>
 </body>
