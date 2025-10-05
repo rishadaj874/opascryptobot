@@ -55,6 +55,7 @@
     a {
       color: #0078ff;
       text-decoration: none;
+      font-weight: bold;
     }
     a:hover {
       text-decoration: underline;
@@ -94,7 +95,6 @@
           (data.result && data.result.short_url);
 
         if (shortUrl) return shortUrl;
-
         console.error("Spoo.me API Error:", data.message || "Unknown error");
         return longUrl; // fallback
       } catch (err) {
@@ -119,9 +119,6 @@
       const shortLink = await shortenWithSpoo(analyserLink);
 
       document.getElementById("result").innerHTML = `
-        <p><strong>Full Link:</strong></p>
-        <a href="${analyserLink}" target="_blank">${analyserLink}</a>
-        <p><strong>Short Link (spoo.me):</strong></p>
         <a href="${shortLink}" target="_blank">${shortLink}</a>
       `;
     }
