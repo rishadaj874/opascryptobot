@@ -75,16 +75,31 @@
   <div id="result"></div>
 
   <script>
-    async function shortenLink(longUrl) {
+    async function shortenWithSpoo(longUrl) {
       try {
-        const res = await fetch(`https://spoo.me/?url=${encodeURIComponent(longUrl)}&json=true`);
-        if (!res.ok) throw new Error('Shortening failed');
-        const data = await res.json();
-        if (data.short_url) return data.short_url;
-        throw new Error('Invalid response');
+        const response = await fetch("https://spoo.me/", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "application/json",
+          },
+          body: new URLSearchParams({ url: longUrl }),
+        });
+
+        const data = await response.json();
+
+        const shortUrl =
+          data.short_url ||
+          (data.url && data.url.short) ||
+          (data.result && data.result.short_url);
+
+        if (shortUrl) return shortUrl;
+
+        console.error("Spoo.me API Error:", data.message || "Unknown error");
+        return longUrl; // fallback
       } catch (err) {
-        console.warn('Spoo.me failed, returning original link:', err);
-        return longUrl;
+        console.error("URL shortening failed:", err.message);
+        return longUrl; // fallback
       }
     }
 
@@ -101,7 +116,7 @@
 
       document.getElementById("result").innerHTML = `<p>Generating short link...</p>`;
 
-      const shortLink = await shortenLink(analyserLink);
+      const shortLink = await shortenWithSpoo(analyserLink);
 
       document.getElementById("result").innerHTML = `
         <p><strong>Full Link:</strong></p>
