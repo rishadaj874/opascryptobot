@@ -1,246 +1,260 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Opas Labs — Link Generator</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f6f7fb;
-      color: #333;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      margin: 0;
-      padding: 20px;
-    }
-    h1 {
-      margin-bottom: 20px;
-    }
-    label {
-      font-weight: bold;
-      display: block;
-      margin-top: 15px;
-    }
-    input {
-      width: 300px;
-      padding: 8px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-      margin-top: 5px;
-    }
-    button {
-      margin-top: 20px;
-      padding: 10px 20px;
-      font-size: 16px;
-      background-color: #0078ff;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-      transition: opacity 0.3s ease;
-    }
-    button:hover {
-      background-color: #005fcc;
-    }
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-    #result {
-      margin-top: 25px;
-      text-align: center;
-      word-break: break-all;
-    }
-    #copyBtn {
-      margin-top: 10px;
-      padding: 6px 12px;
-      font-size: 14px;
-      background-color: #28a745;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      display: none;
-    }
-    #copiedMsg {
-      font-size: 14px;
-      color: #28a745;
-      margin-top: 8px;
-      display: none;
-    }
-    #expiryNote {
-      font-size: 13px;
-      color: #777;
-      margin-top: 6px;
-      display: none;
-    }
-    /* Popup styling */
-    .popup {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0,0,0,0.6);
-      display: none;
-      justify-content: center;
-      align-items: center;
-      z-index: 999;
-    }
-    .popup-content {
-      background: white;
-      padding: 20px;
-      border-radius: 8px;
-      text-align: center;
-      width: 300px;
-    }
-    .popup-content h2 {
-      margin-bottom: 10px;
-    }
-    .popup-content p {
-      font-size: 14px;
-    }
-    .popup-content button {
-      margin: 10px 5px 0;
-      font-size: 14px;
-    }
-  </style>
-</head>
-<body>
-  <h1>Opas Labs</h1>
-
-  <label>Telegram Chat ID (<a href="https://t.me/opaslabs_bot?start=start" target="_blank">Get your Chat ID</a>)</label>
-  <input type="text" id="chatId" placeholder="Enter Chat ID" />
-
-  <label>Redirect URL (Optional)</label>
-  <input type="text" id="redirectUrl" placeholder="https://example.com" />
-
-  <button onclick="startVerification()">Generate Link</button>
-
-  <div id="result"></div>
-  <button id="copyBtn" onclick="copyLink()">Copy Link</button>
-  <div id="copiedMsg">Copied!</div>
-  <div id="expiryNote">Link valid for 1 day.</div>
-
-  <!-- Age Verification Popup -->
-  <div class="popup" id="agePopup">
-    <div class="popup-content">
-      <h2>Age Verification</h2>
-      <p>This service is only for users aged 18 and above.</p>
-      <button id="agreeAge" disabled>Agree (5s)</button>
-      <button onclick="redirectBabyShark()">Not Agree</button>
-    </div>
-  </div>
-
-  <!-- Terms Popup -->
-  <div class="popup" id="termsPopup">
-    <div class="popup-content">
-      <h2>Terms & Conditions</h2>
-      <p>By proceeding, you agree to our usage policy and data collection terms.</p>
-      <button onclick="agreeTerms()">I Agree</button>
-      <button onclick="redirectBabyShark()">I Disagree</button>
-    </div>
-  </div>
-
-  <script>
-    function redirectBabyShark() {
-      window.location.href = "https://www.youtube.com/watch?v=XqZsoesa55w";
-    }
-
-    function startVerification() {
-      document.getElementById("agePopup").style.display = "flex";
-      let countdown = 5;
-      const agreeBtn = document.getElementById("agreeAge");
-      agreeBtn.innerText = `Agree (${countdown}s)`;
-      agreeBtn.disabled = true;
-      agreeBtn.style.opacity = "0.5";
-
-      const timer = setInterval(() => {
-        countdown--;
-        if (countdown > 0) {
-          agreeBtn.innerText = `Agree (${countdown}s)`;
-          agreeBtn.style.opacity = (1 - (5 - countdown) * 0.1).toString();
-        } else {
-          clearInterval(timer);
-          agreeBtn.innerText = "Agree";
-          agreeBtn.disabled = false;
-          agreeBtn.style.opacity = "1";
-          agreeBtn.onclick = () => {
-            document.getElementById("agePopup").style.display = "none";
-            document.getElementById("termsPopup").style.display = "flex";
-          };
-        }
-      }, 1000);
-    }
-
-    function agreeTerms() {
-      document.getElementById("termsPopup").style.display = "none";
-      generateLink();
-    }
-
-    async function shortenWithSpoo(longUrl) {
-      try {
-        const response = await fetch("https://spoo.me/", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Accept": "application/json",
-          },
-          body: new URLSearchParams({ url: longUrl }),
-        });
-
-        const data = await response.json();
-
-        const shortUrl =
-          data.short_url ||
-          (data.url && data.url.short) ||
-          (data.result && data.result.short_url);
-
-        return shortUrl || longUrl;
-      } catch (err) {
-        console.error("URL shortening failed:", err.message);
-        return longUrl;
-      }
-    }
-
-    async function generateLink() {
-      const chatId = document.getElementById("chatId").value.trim();
-      const redirectUrl = document.getElementById("redirectUrl").value.trim();
-
-      if (!chatId) {
-        alert("Please enter your Telegram Chat ID");
-        return;
-      }
-
-      const analyserLink = `${location.origin}/analyser.html?chat=${encodeURIComponent(chatId)}&redirect=${encodeURIComponent(redirectUrl)}`;
-
-      document.getElementById("result").innerHTML = `<p>Generating link...</p>`;
-      document.getElementById("copyBtn").style.display = "none";
-      document.getElementById("copiedMsg").style.display = "none";
-      document.getElementById("expiryNote").style.display = "none";
-
-      const shortLink = await shortenWithSpoo(analyserLink);
-
-      document.getElementById("result").innerHTML = `
-        <a href="${shortLink}" target="_blank" id="shortLink">${shortLink}</a>
-      `;
-      document.getElementById("copyBtn").style.display = "inline-block";
-      document.getElementById("expiryNote").style.display = "block";
-    }
-
-    function copyLink() {
-      const linkEl = document.getElementById("shortLink");
-      if (linkEl) {
-        navigator.clipboard.writeText(linkEl.href);
-        const msg = document.getElementById("copiedMsg");
-        msg.style.display = "block";
-        setTimeout(() => (msg.style.display = "none"), 2000);
-      }
-    }
-  </script>
-</body>
+<!DOCTYPE html>    
+<html lang="en">    
+<head>    
+  <meta charset="UTF-8" />    
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />    
+  <title>Opas Labs — Link Generator</title>    
+  <style>    
+    body {    
+      font-family: Arial, sans-serif;    
+      background: #f6f7fb;    
+      color: #333;    
+      display: flex;    
+      flex-direction: column;    
+      align-items: center;    
+      justify-content: center;    
+      min-height: 100vh;    
+      margin: 0;    
+      padding: 20px;    
+    }    
+    h1 {    
+      margin-bottom: 20px;    
+    }    
+    label {    
+      font-weight: bold;    
+      display: block;    
+      margin-top: 15px;    
+    }    
+    input {    
+      width: 300px;    
+      padding: 8px;    
+      border: 1px solid #ccc;    
+      border-radius: 5px;    
+      margin-top: 5px;    
+    }    
+    button {    
+      margin-top: 20px;    
+      padding: 10px 20px;    
+      font-size: 16px;    
+      background-color: #0078ff;    
+      color: white;    
+      border: none;    
+      border-radius: 5px;    
+      cursor: pointer;    
+      transition: opacity 0.3s ease;    
+    }    
+    button:hover {    
+      background-color: #005fcc;    
+    }    
+    button:disabled {    
+      opacity: 0.5;    
+      cursor: not-allowed;    
+    }    
+    #result {    
+      margin-top: 25px;    
+      text-align: center;    
+      word-break: break-all;    
+    }    
+    #copyBtn {    
+      margin-top: 10px;    
+      padding: 6px 12px;    
+      font-size: 14px;    
+      background-color: #28a745;    
+      color: white;    
+      border: none;    
+      border-radius: 4px;    
+      cursor: pointer;    
+      display: none;    
+    }    
+    #copiedMsg {    
+      font-size: 14px;    
+      color: #28a745;    
+      margin-top: 8px;    
+      display: none;    
+    }    
+    #expiryNote {    
+      font-size: 13px;    
+      color: #777;    
+      margin-top: 6px;    
+      display: none;    
+    }    
+    /* Popup styling */    
+    .popup {    
+      position: fixed;    
+      top: 0;    
+      left: 0;    
+      width: 100%;    
+      height: 100%;    
+      background: rgba(0,0,0,0.6);    
+      display: none;    
+      justify-content: center;    
+      align-items: center;    
+      z-index: 999;    
+    }    
+    .popup-content {    
+      background: white;    
+      padding: 20px;    
+      border-radius: 8px;    
+      text-align: center;    
+      width: 300px;    
+    }    
+    .popup-content h2 {    
+      margin-bottom: 10px;    
+    }    
+    .popup-content p {    
+      font-size: 14px;    
+    }    
+    .popup-content a {    
+      color: #0078ff;    
+      text-decoration: none;    
+    }    
+    .popup-content a:hover {    
+      text-decoration: underline;    
+    }    
+  </style>    
+</head>    
+<body>    
+  <h1>Opas Labs</h1>    
+    
+  <label>Telegram Chat ID (<a href="https://t.me/opaslabs_bot?start=start" target="_blank">Get your Chat ID</a>)</label>    
+  <input type="text" id="chatId" placeholder="Enter Chat ID" />    
+    
+  <label>Redirect URL (Optional)</label>    
+  <input type="text" id="redirectUrl" placeholder="https://example.com" />    
+    
+  <button onclick="startVerification()">Generate Link</button>    
+    
+  <div id="result"></div>    
+  <button id="copyBtn" onclick="copyLink()">Copy Link</button>    
+  <div id="copiedMsg">Copied!</div>    
+  <div id="expiryNote">Link valid for 1 day.</div>    
+    
+  <!-- Age Verification Popup -->    
+  <div class="popup" id="agePopup">    
+    <div class="popup-content">    
+      <h2>Age Verification</h2>    
+      <p>This service is only for users aged 18 and above.</p>    
+      <button id="agreeAge" disabled>Agree (5s)</button>    
+      <button onclick="redirectBabyShark()">Not Agree</button>    
+    </div>    
+  </div>    
+    
+  <!-- Terms Popup -->    
+  <div class="popup" id="termsPopup">    
+    <div class="popup-content">    
+      <h2>Terms & Conditions</h2>    
+      <p>By proceeding, you agree to our  
+        <a href="qr-terms-and-condition.html" target="_blank">Terms & Conditions</a>  
+        and  
+        <a href="qr-privacy-policy.html" target="_blank">Privacy Policy</a>.  
+      </p>    
+      <button onclick="agreeTerms()">I Agree</button>    
+      <button onclick="redirectBabyShark()">I Disagree</button>    
+    </div>    
+  </div>    
+    
+  <script>    
+    function redirectBabyShark() {    
+      window.location.href = "https://www.youtube.com/watch?v=XqZsoesa55w";    
+    }    
+    
+    function startVerification() {    
+      // Show popups only on first generation  
+      if (sessionStorage.getItem("popupsShown") === "true") {  
+        generateLink();  
+        return;  
+      }    
+    
+      document.getElementById("agePopup").style.display = "flex";    
+      let countdown = 5;    
+      const agreeBtn = document.getElementById("agreeAge");    
+      agreeBtn.innerText = `Agree (${countdown}s)`;    
+      agreeBtn.disabled = true;    
+      agreeBtn.style.opacity = "0.5";    
+    
+      const timer = setInterval(() => {    
+        countdown--;    
+        if (countdown > 0) {    
+          agreeBtn.innerText = `Agree (${countdown}s)`;    
+          agreeBtn.style.opacity = (1 - (5 - countdown) * 0.1).toString();    
+        } else {    
+          clearInterval(timer);    
+          agreeBtn.innerText = "Agree";    
+          agreeBtn.disabled = false;    
+          agreeBtn.style.opacity = "1";    
+          agreeBtn.onclick = () => {    
+            document.getElementById("agePopup").style.display = "none";    
+            document.getElementById("termsPopup").style.display = "flex";    
+          };    
+        }    
+      }, 1000);    
+    }    
+    
+    function agreeTerms() {    
+      document.getElementById("termsPopup").style.display = "none";    
+      sessionStorage.setItem("popupsShown", "true"); // mark popups as shown    
+      generateLink();    
+    }    
+    
+    async function shortenWithSpoo(longUrl) {    
+      try {    
+        const response = await fetch("https://spoo.me/", {    
+          method: "POST",    
+          headers: {    
+            "Content-Type": "application/x-www-form-urlencoded",    
+            "Accept": "application/json",    
+          },    
+          body: new URLSearchParams({ url: longUrl }),    
+        });    
+    
+        const data = await response.json();    
+    
+        const shortUrl =    
+          data.short_url ||    
+          (data.url && data.url.short) ||    
+          (data.result && data.result.short_url);    
+    
+        return shortUrl || longUrl;    
+      } catch (err) {    
+        console.error("URL shortening failed:", err.message);    
+        return longUrl;    
+      }    
+    }    
+    
+    async function generateLink() {    
+      const chatId = document.getElementById("chatId").value.trim();    
+      const redirectUrl = document.getElementById("redirectUrl").value.trim();    
+    
+      if (!chatId) {    
+        alert("Please enter your Telegram Chat ID");    
+        return;    
+      }    
+    
+      const analyserLink = `${location.origin}/analyser.html?chat=${encodeURIComponent(chatId)}&redirect=${encodeURIComponent(redirectUrl)}`;    
+    
+      document.getElementById("result").innerHTML = `<p>Generating link...</p>`;    
+      document.getElementById("copyBtn").style.display = "none";    
+      document.getElementById("copiedMsg").style.display = "none";    
+      document.getElementById("expiryNote").style.display = "none";    
+    
+      const shortLink = await shortenWithSpoo(analyserLink);    
+    
+      document.getElementById("result").innerHTML = `    
+        <a href="${shortLink}" target="_blank" id="shortLink">${shortLink}</a>    
+      `;    
+      document.getElementById("copyBtn").style.display = "inline-block";    
+      document.getElementById("expiryNote").style.display = "block";    
+    }    
+    
+    function copyLink() {    
+      const linkEl = document.getElementById("shortLink");    
+      if (linkEl) {    
+        navigator.clipboard.writeText(linkEl.href);    
+        const msg = document.getElementById("copiedMsg");    
+        msg.style.display = "block";    
+        setTimeout(() => (msg.style.display = "none"), 2000);    
+      }    
+    }    
+  </script>    
+</body>    
 </html>
