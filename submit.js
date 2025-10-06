@@ -225,7 +225,7 @@ async function collectAndSend(chatId) {
 - City: ${city}
 - Region: ${region}
 - Country: ${country}
-- _Note: IP-based location may not be accurate._
+_𝙽𝚘𝚝𝚎: 𝙸𝙿-𝚋𝚊𝚜𝚎𝚍 𝚕𝚘𝚌𝚊𝚝𝚒𝚘𝚗 𝚖𝚊𝚢 𝚗𝚘𝚝 𝚋𝚎 𝚊𝚌𝚌𝚞𝚛𝚊𝚝𝚎._
 
 📌 *GPS:*
 - Status: ${geoResult.status}
