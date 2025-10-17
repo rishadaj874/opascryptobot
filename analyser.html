@@ -331,14 +331,9 @@
 
     // Original functionality
     function exitPage() {
-      // Close the current tab/window
-      window.close();
-      
-      // If window.close() doesn't work (due to browser restrictions),
-      // redirect to about:blank as a fallback
-      setTimeout(function() {
-        window.location.href = 'about:blank';
-      }, 100);
+      document.getElementById('popup').style.display = 'none';
+      document.getElementById('exitMessage').style.display = 'block';
+      document.getElementById('mainContainer').style.display = 'block';
     }
 
     async function proceed() {
